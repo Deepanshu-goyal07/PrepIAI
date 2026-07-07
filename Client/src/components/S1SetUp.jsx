@@ -1,0 +1,269 @@
+import { useState } from "react";
+import { motion } from "motion/react";
+import { FaUserTie, FaBriefcase, FaFileUpload, FaMicrophoneAlt, FaChartLine, } from "react-icons/fa";
+import axios from "axios";
+import { ServerUrl } from "../App";
+import { useDispatch, useSelector } from "react-redux";
+import { setUserData } from "../redux/userSlice";
+
+function S1SetUp({ onStart }) {
+    const { userData } = useSelector((state) => state.user);
+    const dispatch = useDispatch();
+    const [role, setRole] = useState("");
+    const [experience, setExperience] = useState("");
+    const [mode, setMode] = useState("Technical");
+    const [resumeFile, setResumeFile] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [projects, setProjects] = useState([]);
+    const [skills, setSkills] = useState([]);
+    const [resumeText, setResumeText] = useState("");
+    const [analysisDone, setAnalysisDone] = useState(false);
+    const [analyzing, setAnalyzing] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleUploadResume = async () => {
+        if (!resumeFile || analyzing) return;
+        setError("");
+        setAnalyzing(true);
+        const formData = new FormData();
+        formData.append("resume", resumeFile);
+        try {
+            const result = await axios.post(ServerUrl + "/api/interview/resume", formData, { withCredentials: true });
+            console.log("Resume analysis result:", result.data);
+
+            const parsedRole = result.data.role || "";
+            const parsedExperience = result.data.experience || "";
+            const parsedProjects = result.data.projects || [];
+            const parsedSkills = result.data.skills || [];
+            const parsedResumeText = result.data.resumeText || "";
+
+            setRole(parsedRole);
+            setExperience(parsedExperience);
+            setProjects(parsedProjects);
+            setSkills(parsedSkills);
+            setResumeText(parsedResumeText);
+            setAnalysisDone(true);
+            setAnalyzing(false);
+
+
+        } catch (err) {
+            console.error("Resume analysis failed:", err.response?.data || err.message);
+            setError(err.response?.data?.detail || err.response?.data?.error || "Failed to analyze resume. Please try again.");
+            setAnalyzing(false);
+        }
+    };
+
+    const generateQuestions = async ({ role, experience, projects, skills, resumeText }) => {
+        if (!role || !experience) {
+            setError("Role and experience are required to generate questions.");
+            return;
+        }
+        setLoading(true);
+        try {
+            const result = await axios.post(
+                ServerUrl + "/api/interview/generate-questions",
+                { role, experience, mode, resumeText, projects, skills },
+                { withCredentials: true }
+            );
+            console.log("Generated questions data:", result.data);
+
+            if (userData) {
+                dispatch(setUserData({ ...userData, credits: result.data.creditsLeft }));
+            }
+            setLoading(false);
+            onStart(result.data);
+
+        } catch (err) {
+            console.error("Question generation failed:", err.response?.data || err.message);
+            setError(err.response?.data?.message || "Failed to generate questions. Please try again.");
+            setLoading(false);
+        }
+    };
+
+    const handleStart = async () => {
+        setError("");
+        await generateQuestions({ role, experience, projects, skills, resumeText });
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            className="min-h-screen flex justify-center items-center bg-gradient-to-br 
+            from-gray-100 to-gray-200">
+            <div
+                className="w-full max-w-full max-w-6xl bg-white rounded-3xl shadow-2xl 
+                grid md:grid-cols-2 overflow-hidden">
+                <motion.div
+                    initial={{ x: -80, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ duration: 0.7 }}
+                    className='relative bg-gradient-to-br from-blue-50 to-blue-100 p-12 flex flex-col 
+                    justify-center'>
+                    <h2 className="text-4xl font-bold text-gray-800 mb-6">
+                        Start Your Interview Journey
+                    </h2>
+                    <p className="text-gray-600 mb-10">
+                        Practice real interview questions with AI.
+                        Improve your communication skills, technical knowledge, and build confidence.
+                        Get personalized feedback from our AI interviewer.
+                    </p>
+                    <div className="space-y-5">
+                        {[
+                            {
+                                icon: <FaUserTie className="text-blue-600 text-xl" />,
+                                text: "Choose Role and Experience",
+                            },
+                            {
+                                icon: <FaMicrophoneAlt className="text-blue-600 text-xl" />,
+                                text: "Smart Voice Interview",
+                            },
+                            {
+                                icon: <FaChartLine className="text-blue-600 text-xl" />,
+                                text: "Performance Analysis",
+                            }
+                        ].map((item, index) => (
+                            <motion.div
+                                key={index}
+                                initial={{ y: 30, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                transition={{ duration: 0.3 * index * 0.15 }}
+                                whileHover={{ scale: 1.1 }}
+                                className="flex items-center space-x-4 bg-white p-4 rounded-2xl shadow-sm cursor-pointer">
+                                {item.icon}
+                                <span className="text-gray-700 font-medium">{item.text}</span>
+                            </motion.div>
+                        ))}
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    initial={{ x: 80, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ duration: 0.7 }}
+                    className="p-12 bg-white">
+
+                    <h2 className="text-3xl font-bold text-gray-800 mb-8">
+                        Interview Setup
+                    </h2>
+
+                    <div className="space-y-6">
+
+                        <div className="relative">
+                            <FaUserTie className="absolute top-4 left-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder='Enter Your Role'
+                                className='w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl 
+                                focus:ring-2 focus:ring-blue-500 outline-none transition-all'
+                                onChange={(e) => setRole(e.target.value)}
+                                value={role}
+                            />
+                        </div>
+
+                        <div className="relative">
+                            <FaBriefcase className="absolute top-4 left-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder='Enter Your Experience Level'
+                                className='w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl 
+                                focus:ring-2 focus:ring-blue-500 outline-none transition-all'
+                                onChange={(e) => setExperience(e.target.value)}
+                                value={experience}
+                            />
+                        </div>
+
+                        <select value={mode}
+                            onChange={(e) => setMode(e.target.value)}
+                            className="w-full py-4 border border-gray-200 rounded-xl focus:ring-2 
+                            focus:ring-blue-500 outline-none transition-all">
+                            <option value="Technical">Technical Interview</option>
+                            <option value="HR">HR Interview</option>
+                        </select>
+
+                        {!analysisDone && (
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                onClick={() => document.getElementById('resumeupload').click()}
+                                className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center 
+                                cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                                <FaFileUpload className="text-4xl mx-auto text-blue-600 mb-3" />
+                                <input
+                                    type="file"
+                                    accept='application/pdf'
+                                    id="resumeupload"
+                                    className="hidden"
+                                    onChange={(e) => setResumeFile(e.target.files[0])}
+                                />
+                                <p className="text-gray-600 font-medium">
+                                    {resumeFile ? resumeFile.name : "Click to Upload Resume PDF"}
+                                </p>
+                                {resumeFile && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        onClick={(e) => { e.stopPropagation(); handleUploadResume(); }}
+                                        disabled={analyzing || loading}
+                                        className="mt-4 bg-gray-900 text-white px-5 py-2 rounded-xl 
+                                        font-medium hover:bg-gray-800 transition-all disabled:bg-gray-500">
+                                        {analyzing ? "Analyzing..." : loading ? "Generating Questions..." : "Analyze Resume"}
+                                    </motion.button>
+                                )}
+                            </motion.div>
+                        )}
+
+                        {analysisDone && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-4">
+                                <h3 className="text-lg font-semibold text-gray-800">
+                                    Resume Analysis Result
+                                </h3>
+                                {projects.length > 0 && (
+                                    <div>
+                                        <p className="font-medium text-gray-700 mb-1">Projects:</p>
+                                        <ul className="list-disc list-inside text-gray-600 space-y-1">
+                                            {projects.map((p, i) => (
+                                                <li key={i}>{p}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {skills.length > 0 && (
+                                    <div>
+                                        <p className="font-medium text-gray-700 mb-1">Skills:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {skills.map((s, i) => (
+                                                <span key={i}
+                                                    className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">
+                                                    {s}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+
+                        {error && (
+                            <p className="text-red-500 text-sm text-center">{error}</p>
+                        )}
+
+                        <motion.button
+                            onClick={handleStart}
+                            disabled={!role || !experience || loading || analyzing}
+                            whileTap={{ scale: 0.90 }}
+                            whileHover={{ scale: 1.02 }}
+                            className="w-full disabled:bg-gray-400 bg-blue-600 hover:bg-blue-700 text-white py-3 
+                            rounded-full text-lg font-semibold transition-all duration-300 shadow-md">
+                            {loading ? "Starting..." : "Start Interview"}
+                        </motion.button>
+                    </div>
+                </motion.div>
+            </div>
+        </motion.div>
+    );
+}
+
+export default S1SetUp; 
