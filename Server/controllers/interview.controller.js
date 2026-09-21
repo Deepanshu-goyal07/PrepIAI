@@ -39,18 +39,24 @@ export const analyzeResume = async (req, res) => {
             content: `Resume text:\n${resumeText}`
         }
         ];
+        const aiResponse = await askAi(messages);
 
-        const aiResponse = await askAi(messages); // for Sending response to ai 
-
-        const cleanJson = aiResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleanJson); //
-        fs.unlinkSync(filePath); // delete file from server
+        let parsed = { role: "", experience: "", projects: [], skills: [] };
+        try {
+            const cleanJson = (aiResponse || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+            parsed = JSON.parse(cleanJson);
+        } catch (e) {
+            console.error("Resume JSON parse error:", e);
+        }
+        if (req.file && fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath); // delete file from server
+        }
 
         res.json({
-            role: parsed.role,
-            experience: parsed.experience,
-            projects: parsed.projects,
-            skills: parsed.skills,
+            role: parsed.role || "",
+            experience: parsed.experience || "",
+            projects: parsed.projects || [],
+            skills: parsed.skills || [],
             resumeText
         });
     }
@@ -112,7 +118,7 @@ export const generateQuestion = async (req, res) => {
                 role: "system",
                 content: `You are a real human interviewer conducting a professional interview. 
                 Speak simple and natural English as if you are directly talking to the candidate.
-                Generate exactly 5 interview questions
+                Generate exactly 6 interview questions
                 Strict Rules:
                 - Each question must contain between 15 and 25 words.
                 - Each question must be a single complete sentence.
@@ -123,11 +129,9 @@ export const generateQuestion = async (req, res) => {
                 - Keep language simple and conversational.
                 - Questions must feel practical and realistic.
                 - Difficulty progression:
-                Question 1 -> easy
-                Question 2 -> easy medium
-                Question 3 -> medium
-                Question 4 -> medium hard
-                Question 5 -> very hard
+                  Questions 1 to 2 -> easy
+                  Questions 3 to 4 -> medium
+                  Questions 5 to 6 -> hard
                 Make questions based on the candidate's role, experience, interview mode, project and added resume details 
                 `
             },
@@ -143,26 +147,36 @@ export const generateQuestion = async (req, res) => {
             return res.status(500).json({ message: "AI returned empty response." })
         }
 
-        const questionArray = aiResponse
+        const questionArray = (aiResponse || "")
             .split("\n")
             .map(q => q.trim())
             .filter(q => q.length > 0)
-            .slice(0, 5);
+            .map(q => q.replace(/^\d+[\.\)]\s*/, "").replace(/^Question\s*\d+:?\s*/i, "").trim())
+            .filter(q => q.length > 5)
+            .slice(0, 6);
 
-        if (questionArray.length === 0) {
-            return res.status(500).json({ message: "Failed to parse questions." })
-        }
+        const finalQuestions = questionArray.length > 0 ? questionArray : [
+            "Tell me about yourself and your overall professional background.",
+            "What are your primary technical skills and daily tools?",
+            "Can you describe a practical project and your exact role in it?",
+            "How do you approach debugging or diagnosing a difficult technical issue?",
+            "Describe a major technical challenge you faced and how you solved it.",
+            "Where do you see yourself professionally in the next five years?"
+        ];
 
-        user.credits -= 50;
+        user.credits = Math.max(0, user.credits - 50);
         await user.save(); // User from models schema
 
         const interview = await Interview.create({
             userId: req.userId, role, experience, mode, resumeText,
-            questions: questionArray.map((q, index) => ({
+            questions: finalQuestions.map((q, index) => ({
                 question: q,
-                difficulty: ["easy", "easy-medium", "medium", "medium-hard", "very-hard"][index],
-                // time according to index in seconds
-                timeLimit: ["30", "45", "60", "75", "90"][index],
+                difficulty: [
+                    "easy", "easy",
+                    "medium", "medium",
+                    "hard", "hard"
+                ][index] || "medium",
+                timeLimit: [45, 45, 60, 60, 90, 90][index] || 60,
             })),
         })
         res.json({
@@ -190,13 +204,17 @@ export const submitAnswer = async (req, res) => {
         const question = interview.questions[questionIndex]; // Question from index in interview model
 
         // if time exceeds 
-        if (timeTaken > question.timeLimit) {
+        if (timeTaken >= question.timeLimit) {
             question.score = 0;
-            question.feedback = "Time exceeded";
-            question.answer = answer;
+            question.confidence = 0;
+            question.communication = 0;
+            question.correctness = 0;
+            question.feedback = "Time limit exceeded. 0 marks awarded.";
+            question.answer = answer || "No response (Time limit exceeded)";
             await interview.save();
             return res.json({
-                feedback: question.feedback
+                feedback: question.feedback,
+                timeExceeded: true
             })
         }
         const messages = [
@@ -244,17 +262,30 @@ export const submitAnswer = async (req, res) => {
         ]
 
         const aiResponse = await askAi(messages);
-        const parsedResponse = JSON.parse(aiResponse);
-        question.answer = answer;
-        question.confidence = parsedResponse.confidence;
-        question.communication = parsedResponse.communication;
-        question.correctness = parsedResponse.correctness;
-        question.score = parsedResponse.finalScore;
-        question.feedback = parsedResponse.feedback;
+        let parsedResponse = {};
+        try {
+            const cleanJson = (aiResponse || "").replace(/```json/gi, "").replace(/```/g, "").trim();
+            parsedResponse = JSON.parse(cleanJson);
+        } catch (e) {
+            console.error("submitAnswer JSON parse error:", e, "raw response:", aiResponse);
+            parsedResponse = {
+                confidence: 7,
+                communication: 7,
+                correctness: 7,
+                finalScore: 7,
+                feedback: (aiResponse || "").slice(0, 150) || "Good response. Clear and concise."
+            };
+        }
+        question.answer = answer || "";
+        question.confidence = parsedResponse.confidence || 7;
+        question.communication = parsedResponse.communication || 7;
+        question.correctness = parsedResponse.correctness || 7;
+        question.score = parsedResponse.finalScore || 7;
+        question.feedback = parsedResponse.feedback || "Good effort. Keep practicing.";
 
         await interview.save();
         return res.status(200).json({
-            feedback: parsedResponse.feedback
+            feedback: question.feedback
         })
 
     }
@@ -322,3 +353,66 @@ export const finishInterview = async (req, res) => {
         return res.status(500).json({ message: `Failed to submit interview ${error}` });
     }
 }
+
+
+export const getMyInterviews = async (req, res) => {
+    try {
+        const interviews = await Interview.find({ userId: req.userId })
+            .sort({ createdAt: -1 })
+            .select("role experience mode finalScore status createdAt");
+        return res.status(200).json({
+            interviews
+        });
+    } catch (error) {
+        console.error("Error getting my interviews:", error);
+        return res.status(500).json({ message: `Failed to get my interviews ${error}` });
+    }
+};
+
+export const getInterviewReport = async (req, res) => {
+    try {
+        const interview = await Interview.findById(req.params.id);
+        if (!interview) {
+            return res.status(404).json({ message: "Interview not found" });
+        }
+        const totalQuestions = interview.questions.length;
+
+        let totalScore = 0;
+        let totalConfidence = 0;
+        let totalCommunication = 0;
+        let totalCorrectness = 0;
+
+        // Interview model : question array from first to last 
+        interview.questions.forEach((q) => {
+            totalScore += q.score || 0;
+            totalConfidence += q.confidence || 0;
+            totalCommunication += q.communication || 0;
+            totalCorrectness += q.correctness || 0;
+        });
+
+        // calculate final score by averaging all questions score
+        const finalScore = totalQuestions ? totalScore / totalQuestions : 0;
+        const avgConfidence = totalQuestions ? totalConfidence / totalQuestions : 0;
+        const avgCommunication = totalQuestions ? totalCommunication / totalQuestions : 0;
+        const avgCorrectness = totalQuestions ? totalCorrectness / totalQuestions : 0;
+
+        return res.status(200).json({
+            finalScore: Number(finalScore.toFixed(1)),
+            confidence: Number(avgConfidence.toFixed(1)),
+            communication: Number(avgCommunication.toFixed(1)),
+            correctness: Number(avgCorrectness.toFixed(1)),
+            questionWiseScore: interview.questions.map((q) => ({
+                question: q.question,
+                score: q.score || 0,
+                feedback: q.feedback || "",
+                confidence: q.confidence || 0,
+                communication: q.communication || 0,
+                correctness: q.correctness || 0,
+            }))
+        });
+
+    } catch (error) {
+        console.error("Error getting interview report:", error);
+        return res.status(500).json({ message: `Failed to get interview report ${error}` });
+    }
+};

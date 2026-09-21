@@ -10,7 +10,12 @@ function Timer({ timeLeft, totalTime }) {
                 value={percentage}
                 text={`${timeLeft}s`}
                 // buildStyles is used for changing the Timer look
-                styles={buildStyles({ textSize: "28px", pathColor: "#10b981", textColor: "#ef4444", trailColor: "#e5e7eb", })}
+                styles={buildStyles({
+                    textSize: "28px",
+                    pathColor: "#10b981",
+                    textColor: "#ef4444",
+                    trailColor: "#e5e7eb",
+                })}
             />
         </div>
     )

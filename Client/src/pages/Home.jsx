@@ -102,7 +102,7 @@ function Home() {
                 desc: "Dynamic follow up based on your response."
               },
               {
-                icon: <BsClock  size={24} />,
+                icon: <BsClock size={24} />,
                 step: "STEP 3",
                 title: "Timer based simulation",
                 desc: "Real time interview pressure with time track."
@@ -124,7 +124,7 @@ function Home() {
                   </div>
                   <span className='text-sm font-bold text-blue-600 tracking-wider'>{item.step}</span>
                 </div>
-                
+
                 <h3 className='text-2xl font-bold mb-4'>{item.title}</h3>
                 <p className='text-gray-500 leading-relaxed'>{item.desc}</p>
                 <div className='absolute -top-8 left-1/2 -transition-x-1/2 bg-white border-2 border-blue-100 text-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg'>
