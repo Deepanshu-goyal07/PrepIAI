@@ -38,7 +38,7 @@ function Navbar() {
                 transition={{ duration: 0.4 }}
                 className='w-full max-w-6xl bg-white rounded-[24px] shadow-sm border-gray-200 px-8 py-4 flex justify-between items-center relative'>
 
-                <div className='flex items-center gap-3 cursor-pointer'>
+                <div onClick={() => navigate('/')} className='flex items-center gap-3 cursor-pointer'>
                     <div className='bg-black text-white  p-2 rounded-lg'>
                         <BsRobot size={20} />
                     </div>
@@ -61,8 +61,8 @@ function Navbar() {
                             <div className='absolute right-[-50px] mt-3 w-64 bg-white shadow-xl border border-gray-200 rounded-xl p-5 z-50'>
                                 <p className='text-sm text-gray-600 mb-4'>Need more credits to continue interviews?</p>
                                 <button
-                                    onClick={() => { navigate('/payment') }}
-                                    className='w-full bg-black text-white py-2 rounded-full'>
+                                    onClick={() => { navigate('/pricing'); setShowCreditPopup(false); }}
+                                    className='w-full bg-black text-white py-2 rounded-full hover:bg-gray-800 transition'>
                                     Buy Credits
                                 </button>
                             </div>
@@ -85,7 +85,7 @@ function Navbar() {
                             <div className='absolute right-[-50px] mt-3 w-48 bg-white shadow-xl border border-gray-200 rounded-xl p-5 z-50'>
                                 <p className='text-md text-blue-500 font-medium mb-1'>{userData?.name}</p>
                                 <button
-                                    onClick={() => { }}
+                                    onClick={() => { navigate('/history'); setShowUserPopup(false); }}
                                     className='w-full text-left text-sm py-2 hover:text-black text-grey-600'>
                                     Interview History
                                 </button>
