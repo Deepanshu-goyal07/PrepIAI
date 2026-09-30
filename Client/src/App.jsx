@@ -11,7 +11,7 @@ import axios from 'axios'
 import { useDispatch } from 'react-redux'
 import { setUserData } from './redux/userSlice'
 
-export const ServerUrl = "http://localhost:3000"
+export const ServerUrl = "https://prepai-qe9e.onrender.com"
 
 function App() {
 
