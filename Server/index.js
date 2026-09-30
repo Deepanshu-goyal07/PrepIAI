@@ -11,8 +11,24 @@ import paymentRouter from "./routes/payment.route.js"
 
 const app = express();
 
+app.set("trust proxy", 1);
+
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "https://prepai-client-ylxu.onrender.com",
+    process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: "https://prepai-client-ylxu.onrender.com",
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin) || origin.endsWith(".onrender.com")) {
+            return callback(null, true);
+        }
+        return callback(null, false);
+    },
     credentials: true
 }))
 
