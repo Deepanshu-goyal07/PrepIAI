@@ -17,6 +17,17 @@ export const ServerUrl =
     ? "http://localhost:3000"
     : "https://prepai-qe9e.onrender.com");
 
+axios.defaults.withCredentials = true;
+
+// Attach authorization header automatically to all axios requests if token exists
+axios.interceptors.request.use((config) => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token && !config.headers["Authorization"]) {
+    config.headers["Authorization"] = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 function App() {
 
   const dispatch = useDispatch()  //  React Redux hook that returns a reference to the Redux store's dispatch function.
@@ -24,7 +35,7 @@ function App() {
   useEffect(() => {           //  React hook that lets you perform side effects in a functional component.
     const getUser = async () => { //  Async function to get the current user from the server.
       try {
-        const result = await axios.get(`${ServerUrl}/api/user/current-user`, { withCredentials: true }); // Make a GET request to the server to get the current user.
+        const result = await axios.get(`${ServerUrl}/api/user/current-user`); // Make a GET request to the server to get the current user.
         if (result.data.success) { // Check if the request was successful.
           dispatch(setUserData(result.data.user));
         } else {

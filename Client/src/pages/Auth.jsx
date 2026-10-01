@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
 import { GiVintageRobot } from "react-icons/gi";
@@ -15,21 +15,48 @@ import { setUserData } from '../redux/userSlice';
 function Auth({ isModel = false }) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
+    const [authError, setAuthError] = useState("");
+
     const handleGoogleAuth = async () => {
         try {
-            const response = await signInWithPopup(auth, provider)
-            let User = response.user  // Get user data from response
-            let name = User.displayName
-            let email = User.email
-            const result = await axios.post(ServerUrl + "/api/auth/google", { name, email }, { withCredentials: true })
+            setLoading(true);
+            setAuthError("");
+            const response = await signInWithPopup(auth, provider);
+            let User = response.user;  // Get user data from response
+            let name = User.displayName;
+            let email = User.email;
+            
+            const result = await axios.post(ServerUrl + "/api/auth/google", { name, email }, { withCredentials: true });
             if (result.data.success) {
+                if (result.data.token) {
+                    localStorage.setItem("token", result.data.token);
+                    axios.defaults.headers.common["Authorization"] = `Bearer ${result.data.token}`;
+                }
                 dispatch(setUserData(result.data.user)); // Dispatch user data to Redux store
                 navigate('/');
+            } else {
+                setAuthError(result.data.message || "Login failed on server.");
+                dispatch(setUserData(null));
             }
-
         } catch (error) {
-            console.log(error)
+            console.error("Google Auth error:", error);
+            let message = "Failed to sign in with Google.";
+            if (error.code === "auth/popup-closed-by-user") {
+                message = "Sign-in popup was closed before completion.";
+            } else if (error.code === "auth/unauthorized-domain") {
+                message = "This domain is not authorized in Firebase Console -> Authentication -> Settings -> Authorized Domains.";
+            } else if (error.response?.data?.message) {
+                message = error.response.data.message;
+            } else if (error.message?.includes("Network Error")) {
+                message = "Backend server is waking up or temporarily unavailable. Please wait 30 seconds and try again.";
+            } else if (error.message) {
+                message = error.message;
+            }
+            setAuthError(message);
             dispatch(setUserData(null)); // Set user data to null
+        } finally {
+            setLoading(false);
         }
     }
     return (
@@ -56,15 +83,23 @@ function Auth({ isModel = false }) {
                     </span>
                 </h1>
 
-                <p className='text-center text-gray-500 text-sm leading-relaxed mb-8'>
+                <p className='text-center text-gray-500 text-sm leading-relaxed mb-6'>
                     Sign in to Start AI-Powered mock Interviews, track your progress, and unlock detailed performance insights.
                 </p>
 
+                {authError && (
+                    <div className='mb-6 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs text-center leading-relaxed'>
+                        {authError}
+                    </div>
+                )}
+
                 <motion.button
+                    disabled={loading}
                     onClick={handleGoogleAuth}
-                    whileHover={{ opacity: 1, scale: 1.05 }}
-                    className='w-full bg-black flex items-center justify-center gap-3 py-3 black text-white rounded-full shadow-md'>
-                    <FcGoogle size={20} /> Continue with Google
+                    whileHover={{ opacity: 1, scale: loading ? 1 : 1.02 }}
+                    whileTap={{ scale: loading ? 1 : 0.98 }}
+                    className={`w-full bg-black flex items-center justify-center gap-3 py-3 text-white rounded-full shadow-md transition-opacity ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-neutral-800'}`}>
+                    <FcGoogle size={20} /> {loading ? "Signing in..." : "Continue with Google"}
                 </motion.button>
             </motion.div>
         </div>
