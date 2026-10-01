@@ -1,6 +1,6 @@
 import dotenv from "dotenv"
 dotenv.config();
-import connectDB, { lastDbError } from "./config/connectDB.js"
+import connectDB, { lastDbError, getSanitizedMongoUrl } from "./config/connectDB.js"
 import express from "express"
 import cookieParser from "cookie-parser";
 import cors from "cors"
@@ -45,13 +45,17 @@ app.get("/", (req, res) => {
     });
 });
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+    if (mongoose.connection.readyState !== 1) {
+        await connectDB();
+    }
     const states = ["disconnected", "connected", "connecting", "disconnecting"];
     const dbState = states[mongoose.connection.readyState] || "unknown";
     res.json({
         status: "ok",
         mongodb: dbState,
         dbError: lastDbError,
+        databaseTarget: getSanitizedMongoUrl(),
         environment: {
             hasMongoUrl: Boolean(process.env.MONGODB_URL),
             hasJwtSecret: Boolean(process.env.JWT_SECRET),
