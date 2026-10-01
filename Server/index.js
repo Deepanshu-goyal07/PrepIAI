@@ -1,6 +1,6 @@
 import dotenv from "dotenv"
 dotenv.config();
-import connectDB from "./config/connectDB.js"
+import connectDB, { lastDbError } from "./config/connectDB.js"
 import express from "express"
 import cookieParser from "cookie-parser";
 import cors from "cors"
@@ -51,6 +51,7 @@ app.get("/api/health", (req, res) => {
     res.json({
         status: "ok",
         mongodb: dbState,
+        dbError: lastDbError,
         environment: {
             hasMongoUrl: Boolean(process.env.MONGODB_URL),
             hasJwtSecret: Boolean(process.env.JWT_SECRET),
